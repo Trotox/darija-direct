@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Darija Direct</title>
+<style>
+/* Mise en page : une colonne plein écran — compteur en haut, texte qui défile au milieu, commandes en bas. */
+:root {
+  --bg: #f4f6f3; --surface: #ffffff; --line: #dfe5e1; --ink: #15201c; --muted: #5d6a65;
+  --accent: #0d6b5b; --accent-ink: #ffffff; --rec: #c5352b; --pending: #a8520f; --bad: #a3271f; --bad-bg: #fbe3e0;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-text: "Noto Naskh Arabic", "Geeza Pro", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --font-num: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1412; --surface: #171f1c; --line: #2a3531; --ink: #e8efeb; --muted: #94a19c; --accent: #4cc2a7; --accent-ink: #06241d; --rec: #f0685c; --pending: #f0a45c; --bad: #f6a39b; --bad-bg: #40181a; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 16px/1.45 var(--font); display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px));
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+header { display: flex; align-items: center; gap: 10px; padding-block: 12px 8px; }
+header h1 { font-size: 18px; font-weight: 650; margin: 0; letter-spacing: -.01em; flex: 1; }
+button { font: inherit; color: inherit; }
+.ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; font-size: 14px; font-weight: 600; }
+.clock { display: flex; align-items: flex-end; gap: 12px; padding-block: 4px 6px; }
+.clock .t { font: 600 40px/1 var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.clock.rec .t { color: var(--rec); }
+.clock .cap { font-size: 12.5px; color: var(--muted); padding-bottom: 4px; min-width: 0; }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .08s linear; }
+#status { font-size: 13px; color: var(--muted); min-height: 20px; padding-top: 8px; }
+#error { font-size: 13.5px; background: var(--bad-bg); color: var(--bad); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+main { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+#text { font: 21px/1.75 var(--font-text); white-space: pre-wrap; overflow-wrap: anywhere; unicode-bidi: plaintext; text-align: start; }
+#text .seg { unicode-bidi: plaintext; }
+#text .wait { color: var(--pending); }
+#text .draft { color: var(--muted); }
+#empty { color: var(--muted); font-size: 15px; }
+footer { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding-block: 12px; }
+.cmd { border: 1px solid var(--line); background: var(--surface); font-weight: 600; border-radius: 14px; padding: 14px 14px; }
+#main { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-size: 17px; }
+#main.rec { background: var(--rec); color: #fff; }
+.cmd:disabled { opacity: .5; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+#sheet { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; z-index: 5; }
+#sheet .box { background: var(--surface); color: var(--ink); width: min(560px, 100%); border-radius: 18px 18px 0 0; padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); display: grid; gap: 12px; }
+#sheet h2 { font-size: 17px; margin: 0; }
+#sheet p { margin: 0; font-size: 14px; color: var(--muted); }
+#sheet label { font-size: 13px; font-weight: 600; color: var(--muted); display: grid; gap: 4px; }
+#sheet input[type=password], #sheet input[type=text] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; width: 100%; }
+#sheet .row { display: flex; gap: 8px; flex-wrap: wrap; }
+#sheet .row button { flex: 1; }
+#file { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Darija Direct</h1>
+  <button class="ghost" id="open-file">Fichier audio</button>
+  <button class="ghost" id="open-settings" aria-label="Réglages">Réglages</button>
+</header>
+
+<div class="clock" id="clock">
+  <div class="t" id="time">0:00</div>
+  <div class="cap" id="cap">darija et français, même mélangés</div>
+</div>
+<div class="bar"><i id="level"></i></div>
+<div id="status" role="status"></div>
+<div id="error" hidden></div>
+
+<main id="scroll">
+  <div id="empty">Appuie sur Démarrer et parle. Le texte s'affiche en gris deux à trois secondes après chaque pause, puis il est relu et corrigé par blocs. Le son est envoyé à Mistral pour être transcrit.</div>
+  <div id="text" dir="auto"></div>
+</main>
+
+<footer>
+  <button class="cmd" id="main">Démarrer</button>
+  <button class="cmd" id="copy">Copier</button>
+  <button class="cmd" id="clear">Effacer</button>
+</footer>
+<input type="file" id="file" accept="audio/*,video/mp4,.opus,.ogg,.m4a,.mp3,.wav,.webm">
+
+<div id="sheet" hidden>
+  <div class="box" role="dialog" aria-labelledby="sheet-title">
+    <h2 id="sheet-title">Clé Mistral</h2>
+    <p id="sheet-text">Colle la clé API Mistral. Elle est gardée dans ce navigateur uniquement et sert à payer la transcription (environ 0,004 $ par minute).</p>
+    <label>Clé API
+      <input id="key" type="password" autocomplete="off" placeholder="Clé de console.mistral.ai">
+    </label>
+    <div class="row">
+      <button class="cmd" id="forget">Oublier la clé</button>
+      <button class="cmd" id="save" style="background:var(--accent);color:var(--accent-ink);border-color:transparent">Enregistrer</button>
+    </div>
+    <label id="share-wrap" hidden>Lien à envoyer à un collègue (il contient la clé)
+      <input id="share" type="text" readonly>
+    </label>
+    <div class="row"><button class="cmd" id="make-link">Créer un lien de partage</button><button class="cmd" id="close">Fermer</button></div>
+  </div>
+</div>
+
+<script>
+const API = "https://api.mistral.ai/v1/audio/transcriptions";
+const MODEL = "voxtral-small-transcribe-3-0";      // meilleur résultat mesuré sur du darija mêlé de français, sans indication de langue
+const PRICE = 0.004;                               // $ par minute d'audio (tarif Mistral, nov. 2026)
+const SR = 16000;
+const MIN_S = 4, MAX_S = 20, PAUSE_MS = 650;       // un passage part à la première pause après 4 s, au plus tard à 20 s
+const BLOCK_S = 45;                                // relecture : dès 45 s de parole cumulée, le bloc entier est retranscrit d'un seul tenant
+const SESSION_MAX_S = 30 * 60;                     // arrêt automatique : micro oublié
+const $ = (s) => document.querySelector(s);
+const el = { main: $("#main"), time: $("#time"), cap: $("#cap"), clock: $("#clock"), level: $("#level"), status: $("#status"), error: $("#error"), text: $("#text"), empty: $("#empty"), scroll: $("#scroll"), sheet: $("#sheet"), key: $("#key") };
+
+/* ---------- clé : mémoire du navigateur, ou lien …#k=CLÉ ---------- */
+let KEY = "";
+try { KEY = localStorage.getItem("darija-direct-key") || ""; } catch {}
+const fromHash = new URLSearchParams(location.hash.slice(1)).get("k");
+if (fromHash) { KEY = fromHash; try { localStorage.setItem("darija-direct-key", KEY); } catch {} history.replaceState(null, "", location.pathname + location.search); }
+function openSheet() { el.key.value = KEY; $("#share-wrap").hidden = true; el.sheet.hidden = false; }
+$("#open-settings").onclick = openSheet;
+$("#close").onclick = () => { el.sheet.hidden = true; };
+$("#save").onclick = () => { KEY = el.key.value.trim(); try { KEY ? localStorage.setItem("darija-direct-key", KEY) : localStorage.removeItem("darija-direct-key"); } catch {} el.sheet.hidden = true; fail(""); };
+$("#forget").onclick = () => { KEY = ""; el.key.value = ""; try { localStorage.removeItem("darija-direct-key"); } catch {} };
+$("#make-link").onclick = () => { const k = el.key.value.trim(); if (!k) return; $("#share").value = location.origin + location.pathname + "#k=" + encodeURIComponent(k); $("#share-wrap").hidden = false; $("#share").select(); };
+
+/* ---------- état et affichage ---------- */
+let recording = false, ctx, stream, node, wakeLock;
+let cur = null, pre = [], noise = 0.004, total = 0, billed = 0;
+let segs = [], pending = 0, block = null;
+const mmss = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+function fail(t) { el.error.hidden = !t; el.error.textContent = t || ""; }
+function render() {
+  el.empty.hidden = segs.length > 0 || recording;
+  el.text.replaceChildren(...segs.map((s) => { const e = document.createElement("span"); e.className = "seg" + (s.text === null ? " wait" : s.draft ? " draft" : ""); e.textContent = s.text === null ? " …" : (s.text ? s.text + " " : ""); return e; }));
+  el.scroll.scrollTop = el.scroll.scrollHeight;
+}
+function paint() {
+  el.main.textContent = recording ? "Arrêter" : "Démarrer"; el.main.className = "cmd" + (recording ? " rec" : "");
+  el.clock.className = "clock" + (recording ? " rec" : "");
+  el.time.textContent = mmss(total / SR);
+  el.cap.textContent = billed ? `≈ ${((billed / 60) * PRICE).toFixed(3)} $ transcrits` : "darija et français, même mélangés";
+  el.status.textContent = recording ? (pending ? "Écoute… transcription en cours" : "Écoute…") : (pending ? "Transcription des dernières phrases…" : (segs.length ? "Terminé." : ""));
+}
+
+/* ---------- envoi d'un passage à Mistral (les réponses s'affichent dans l'ordre de parole) ---------- */
+function wav(chunks, n) {
+  const b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+  let o = 44; for (const c of chunks) for (let i = 0; i < c.length; i++, o += 2) v.setInt16(o, Math.max(-32768, Math.min(32767, c[i] * 32767)), true);
+  return new Blob([b], { type: "audio/wav" });
+}
+async function transcribe(blob, name, seconds, draft) {
+  const seg = { text: null, draft: !!draft }; segs.push(seg); pending++; render(); paint();
+  let lastErr = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const form = new FormData(); form.append("file", blob, name); form.append("model", MODEL);
+      const r = await fetch(API, { method: "POST", headers: { Authorization: "Bearer " + KEY }, body: form });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { seg.text = (j.text || "").trim(); billed += (j.usage && j.usage.prompt_audio_seconds) || seconds || 0; lastErr = ""; break; }
+      if (r.status === 401) { lastErr = "Clé Mistral refusée. Ouvre Réglages et vérifie la clé."; if (recording) stop(); break; }
+      lastErr = r.status === 429 ? "Mistral limite le débit de cette clé. Réessaie dans une minute." : "Mistral a répondu par une erreur " + r.status + ".";
+      if (r.status < 500 && r.status !== 429) break;
+    } catch (e) { lastErr = "Connexion à Mistral impossible. Vérifie le réseau."; }
+    await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+  }
+  if (lastErr) { seg.text = "[passage non transcrit]"; fail(lastErr); }
+  pending--; render(); paint();
+  return seg;
+}
+// Relecture : un bloc de plusieurs passages est renvoyé en entier. Avec plus de contexte, le modèle garde mieux
+// le darija au milieu du français ; son texte remplace alors les brouillons du bloc.
+async function consolidate(b) {
+  if (!b || !b.jobs.length) return;
+  if (b.jobs.length === 1) { (await b.jobs[0]).draft = false; render(); return; }
+  pending++; paint();
+  const drafts = await Promise.all(b.jobs);
+  let text = null;
+  try {
+    const form = new FormData(); form.append("file", wav(b.chunks, b.n), "bloc.wav"); form.append("model", MODEL);
+    const r = await fetch(API, { method: "POST", headers: { Authorization: "Bearer " + KEY }, body: form });
+    if (r.ok) { const j = await r.json(); text = (j.text || "").trim(); billed += (j.usage && j.usage.prompt_audio_seconds) || b.n / SR; }
+  } catch {}
+  if (text) { drafts.forEach((d, i) => { d.text = i === 0 ? text : ""; d.draft = false; }); }
+  else drafts.forEach((d) => { d.draft = false; });              // relecture impossible : on garde les brouillons
+  pending--; render(); paint();
+}
+
+/* ---------- découpage : un passage se termine à une pause ---------- */
+function flush(last) {
+  const c = cur; cur = null;
+  if (c && c.voiced >= 0.3 * SR) {
+    if (!block) block = { chunks: [], n: 0, jobs: [] };
+    block.jobs.push(transcribe(wav(c.chunks, c.n), "passage.wav", c.n / SR, true));
+    for (const ch of c.chunks) block.chunks.push(ch); block.n += c.n;
+  }
+  if (block && (last || block.n >= BLOCK_S * SR)) { const b = block; block = null; consolidate(b); }
+}
+function onChunk(chunk) {
+  if (!recording) return;
+  let sq = 0; for (let i = 0; i < chunk.length; i++) sq += chunk[i] * chunk[i];
+  const rms = Math.sqrt(sq / chunk.length), ms = (chunk.length / SR) * 1000;
+  total += chunk.length;
+  noise = rms < noise ? noise * 0.7 + rms * 0.3 : noise * 0.997 + rms * 0.003;
+  const voiced = rms > Math.min(0.05, Math.max(0.006, noise * 3.5));
+  el.level.style.width = Math.min(100, rms * 500) + "%";
+  if (!cur) {
+    if (voiced) { cur = { chunks: [...pre], n: pre.reduce((a, c) => a + c.length, 0), voiced: 0, sil: 0 }; pre = []; }
+    else { pre.push(chunk); if (pre.length > 4) pre.shift(); }
+  }
+  if (cur) {
+    cur.chunks.push(chunk); cur.n += chunk.length;
+    if (voiced) { cur.voiced += chunk.length; cur.sil = 0; } else cur.sil += ms;
+    if ((cur.sil >= PAUSE_MS && cur.n >= MIN_S * SR) || cur.n >= MAX_S * SR) flush();
+    else if (cur.sil >= 3000) flush();                          // long silence : on envoie même un passage court
+  }
+  if (total % SR < chunk.length) paint();
+  if (total >= SESSION_MAX_S * SR) stop("Arrêt automatique après 30 minutes.");
+}
+
+/* ---------- micro ---------- */
+function makeCapture(ctx, cb) {
+  const ratio = ctx.sampleRate / SR; let acc = 0, cnt = 0, phase = 0;
+  const n = ctx.createScriptProcessor(4096, 1, 1);
+  n.onaudioprocess = (e) => {
+    const ch = e.inputBuffer.getChannelData(0), out = [];
+    for (let i = 0; i < ch.length; i++) { acc += ch[i]; cnt++; phase += 1; if (phase >= ratio) { phase -= ratio; out.push(acc / cnt); acc = 0; cnt = 0; } }
+    if (out.length) cb(Float32Array.from(out));
+  };
+  const mute = ctx.createGain(); mute.gain.value = 0; n.connect(mute); mute.connect(ctx.destination);
+  return n;
+}
+async function start() {
+  fail("");
+  if (!KEY) { openSheet(); return; }
+  if (!navigator.mediaDevices) { fail("Le micro n'est accessible que si la page est ouverte en https://."); return; }
+  el.main.disabled = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === "suspended") await ctx.resume();
+    node = makeCapture(ctx, onChunk); ctx.createMediaStreamSource(stream).connect(node);
+  } catch (e) {
+    closeAudio(); el.main.disabled = false;
+    fail(e && e.name === "NotAllowedError" ? "Micro refusé. Autorise le micro pour ce site dans les réglages du navigateur, puis réessaie." : "Impossible d'ouvrir le micro : " + ((e && e.message) || e));
+    return;
+  }
+  cur = null; block = null; pre = []; noise = 0.004; total = 0; recording = true; el.main.disabled = false;
+  if (segs.length) segs.push({ text: "\n" });
+  render(); paint();
+  try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+}
+function closeAudio() {
+  try { if (node) { node.onaudioprocess = null; node.disconnect(); } stream?.getTracks().forEach((t) => t.stop()); ctx?.close(); } catch {}
+  try { wakeLock?.release(); } catch {}
+  node = stream = ctx = wakeLock = null; el.level.style.width = "0";
+}
+function stop(why) {
+  if (!recording) return;
+  recording = false; closeAudio(); flush(true); paint(); if (why) el.status.textContent = why;
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden && recording) stop("Arrêté : la page est passée en arrière-plan."); });
+
+/* ---------- fichier audio entier ---------- */
+$("#open-file").onclick = () => { if (!KEY) return openSheet(); if (!recording) $("#file").click(); };
+$("#file").onchange = async () => {
+  const f = $("#file").files[0]; $("#file").value = ""; if (!f) return;
+  fail(""); if (segs.length) segs.push({ text: "\n" });
+  let secs = 0; try { const c = new (window.AudioContext || window.webkitAudioContext)(); secs = (await c.decodeAudioData(await f.arrayBuffer())).duration; c.close(); } catch {}
+  await transcribe(f, f.name, secs);
+};
+
+/* ---------- commandes ---------- */
+el.main.onclick = () => (recording ? stop() : start());
+const plain = () => segs.map((s) => s.text === null ? "" : s.text).join(" ").replace(/ ?\n ?/g, "\n").replace(/ {2,}/g, " ").trim();
+$("#copy").onclick = async () => {
+  const t = plain(); if (!t) return;
+  try { await navigator.clipboard.writeText(t); el.status.textContent = "Texte copié."; }
+  catch { const r = document.createRange(); r.selectNodeContents(el.text); const s = getSelection(); s.removeAllRanges(); s.addRange(r); el.status.textContent = "Texte sélectionné : utilise Copier."; }
+};
+$("#clear").onclick = () => { if (recording || pending) return; segs = []; total = 0; billed = 0; fail(""); render(); paint(); };
+render(); paint();
+if (!KEY) openSheet();
+self.__state = () => ({ recording, pending, text: plain(), n: segs.length, billed, total: total / SR });
+</script>
+</body>
+</html>
